@@ -15,6 +15,7 @@ type FullAssetPath = string;
  */
 type EndIndex = number;
 
+/** The options. All fields are optional through Partial<…> */
 type EleventyAssetHashOptions = {
   /**
    * An algorithm to hash with. Must be supported by crypto.subtle.digest().
@@ -32,6 +33,8 @@ type EleventyAssetHashOptions = {
   param: string;
   /** The extensions for the files to hash */
   hashedExtensions: string[];
+  /** Turn off automatically adding extensions from processExtensions */
+  disableAutomaticExtensionProcessing: boolean;
   /**
    * A path to resolve absolute URLs to. Defaults to Elevent output dir.
    * Ignored if a custom `resolvePath` function is given.
@@ -97,10 +100,11 @@ export default function EleventyAssetHash(
     algorithm = "SHA-256",
     maxLength = Infinity,
     rootDir = config.dir.output,
-    processExtensions = ["html", "css", "js"],
+    processExtensions = ["html"],
     hashedExtensions = ["css", "js"],
     computeChecksum = createChecksumComputer(algorithm, maxLength),
     param = "v",
+    disableAutomaticExtensionProcessing = false,
   } = options;
 
   /** Map an AssetPath to its FullAssetPath (relative to project root) */
@@ -158,7 +162,10 @@ export default function EleventyAssetHash(
     },
   );
 
-  const formats = [...config.templateFormatsAdded];
+  if(disableAutomaticExtensionProcessing) return
+
+  const formats = [...config.extensionMap]
+    .map(({outputFileExtension}) => outputFileExtension);
   const compile = (content: string) => () => content;
   for (const extension of processExtensions) {
     if (formats.includes(extension)) continue;

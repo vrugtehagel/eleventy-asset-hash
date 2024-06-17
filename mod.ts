@@ -64,7 +64,7 @@ type EleventyAssetHashOptions = {
 function createChecksumComputer(
   algorithm: string,
   maxLength: number,
-): (assetPath: FullAssetPath) => Checksum | null {
+): (assetPath: FullAssetPath) => Promise<Checksum | null> {
   const syncCache = new Map<FullAssetPath, Checksum | null>();
   const asyncCache = new Map<FullAssetPath, Promise<Checksum | null>>();
   const computeChecksum = async (
@@ -72,7 +72,7 @@ function createChecksumComputer(
   ): Promise<Checksum | null> => {
     const body = await fs.readFile(assetPath).catch(() => null);
     if (body == null) return null;
-    const buffer = crypto.subtle.digest(algorithm, body);
+    const buffer = await crypto.subtle.digest(algorithm, body);
     const uint8Array = new Uint8Array(buffer);
     const rawChecksum = String.fromCharCode(...uint8Array);
     const checksum = btoa(rawChecksum);
@@ -80,8 +80,8 @@ function createChecksumComputer(
     return checksum.slice(0, maxLength);
   };
   return async (assetPath: FullAssetPath): Promise<Checksum | null> => {
-    if (syncCache.has(assetPath)) return syncCache.get(assetPath);
-    if (asyncCache.has(assetPath)) return await asyncCache.get(assetPath);
+    if (syncCache.has(assetPath)) return syncCache.get(assetPath)!;
+    if (asyncCache.has(assetPath)) return await asyncCache.get(assetPath)!;
     const promise = computeChecksum(assetPath);
     asyncCache.set(assetPath, promise);
     const checksum = await promise;
@@ -101,36 +101,31 @@ export default function EleventyAssetHash(
   config: EleventyConfig,
   options: Partial<EleventyAssetHashOptions> = {},
 ) {
-  const normalizedOptions = Object.assign({}, DEFAULTS, options);
-  if (!normalizedOptions.processExtensions.every((ext) => ext in PROCESSORS)) {
-    throw new Error(`Unprocessable extension "${ext}" specified.`);
-  }
-  const computeChecksum = normalizedOptions.computeChecksum ??
-    createChecksumComputer(
-      normalizedOptions.algorithm,
-      normalizedOptions.maxLength,
-    );
+  const {
+    algorithm = "SHA-256",
+    maxLength = Infinity,
+    rootDir = config.dir.output,
+    processExtensions = ["html", "css", "js"],
+    hashedExtensions = ["css", "js"],
+    computeChecksum = createChecksumComputer(algorithm, maxLength),
+    param = "v",
+  } = options;
 
   /** Map an AssetPath to its FullAssetPath (relative to project root) */
-  const rootDir = normalizedOptions.rootDir ?? config.dir.output;
-  function defaultResolvePath(
-    assetPath: AssetPath,
-    page: any,
-  ): FullAssetPath {
+  function defaultResolvePath(assetPath: AssetPath, page: any): FullAssetPath {
     const isAbsolute = assetPath.startsWith("/");
     if (isAbsolute) return path.resolve(rootDir, `.${assetPath}`);
-    return path.resolve(path.dirname(page.outputDir), assetPath);
+    return path.resolve(path.dirname(page.outputPath), assetPath);
   }
-  const resolvePath = normalizedOptions.resolvePath ?? defaultResolvePath;
-  const invalidHashedExtension = normalizedOptions.hashedExtensions
-    .find((extension) => /\W/.test(extension));
-  if (invalidHashedExtension != null) {
-    throw new Error(`Cannot match extension "${invalidHashedExtension}"`);
+  const { resolvePath = defaultResolvePath } = options;
+  if (hashedExtensions.some((extension) => /\W/.test(extension))) {
+    const invalid = hashedExtensions.find((extension) => /\W/.test(extension));
+    throw new Error(`Cannot match extension "${invalid}"`);
   }
+
   const urlChars = `[-.\\w~:/?#[\\]@!$&'()*+,;%=]*`;
-  const extensionRefex = `(?:${normalizedOptions.hashedExtensions.join("|")})`;
   const assetPathRegex = new RegExp(
-    `\\.{0,2}(?<!\w)\\/${urlChars}\\.${extensionRefex})`,
+    `\\.{0,2}(?<!\w)\\/${urlChars}\\.(?:${hashedExtensions.join("|")})`,
     "g",
   );
 
@@ -140,31 +135,42 @@ export default function EleventyAssetHash(
    */
   config.addTransform(
     "eleventy-asset-hash",
-    async function (this: any, content: string): string {
+    async function (this: any, content: string): Promise<string> {
       const outputPath = this.page.outputPath as string;
       if (!outputPath) return content;
       const outputExtension = this.page.outputFileExtension as string;
       if (!outputPath.endsWith(`.${outputExtension}`)) return content;
-      const assetPathMatches = [...content.matchAll(assetPathRegex)]
-        .map((match) => [match[0], match.index + match[0].length]);
-      if (matches.length == 0) return content;
-      const promises = assetPathMatches.map(async ([match, endIndex]) => [
-        endIndex,
-        await computeChecksum(resolvePath(match)),
-      ]);
+      if (!processExtensions.includes(outputExtension)) {
+        return content;
+      }
+      const page = this.page;
+      const rawMatches = [...content.matchAll(assetPathRegex)];
+      const promises = rawMatches.map(async (match) => {
+        const assetPath: AssetPath = match[0];
+        const endIndex = match.index + assetPath.length;
+        const fullAssetPath: FullAssetPath = resolvePath(assetPath, page);
+        const checksum = await computeChecksum(fullAssetPath);
+        return [endIndex, checksum] as [EndIndex, Checksum | null];
+      });
       // Flip it so we can loop-and-replace without messing up end indexes
       const insertions = await Promise.all(promises.reverse());
       let result = content;
       for (const [endIndex, checksum] of insertions) {
-        const hasQueryParams = results[endIndex + 1] == "?";
-        const param = `${normalizedOptions.param}=${checksum}`;
-        if (hasQueryParams) {
-          result = insertAt(result, `${param}&`, indexIndex + 1);
-        } else {
-          result = insertAt(result, param, endIndex);
-        }
+        if (checksum == null) continue;
+        const hasQueryParams = content[endIndex + 1] == "?";
+        result = hasQueryParams
+          ? insertAt(result, `${param}=${checksum}&`, endIndex + 1)
+          : insertAt(result, `?${param}=${checksum}`, endIndex);
       }
       return result;
     },
   );
+
+  const formats = [...config.templateFormatsAdded]
+  const compile = content => () => content
+  for(const extension of processExtensions){
+    if(formats.includes(extension)) continue;
+    config.addTemplateFormats(extension);
+    config.addExtension(extension, {outputFileExtension: extension, compile})
+  }
 }

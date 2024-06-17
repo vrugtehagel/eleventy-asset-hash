@@ -1,14 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const DEFAULTS: EleventyAssetHashOptions = {
-  algorithm: "SHA-256",
-  maxLength: Infinity,
-  param: "v",
-  processExtensions: ["html", "css", "js"],
-  hashedExtensions: ["css", "js"],
-};
-
 /** The Eleventy config object, should be a better type than "any" but alas */
 type EleventyConfig = any;
 /** Checksums are a shortish clash-tolerant string representing a file's contents */
@@ -166,11 +158,11 @@ export default function EleventyAssetHash(
     },
   );
 
-  const formats = [...config.templateFormatsAdded]
-  const compile = content => () => content
-  for(const extension of processExtensions){
-    if(formats.includes(extension)) continue;
+  const formats = [...config.templateFormatsAdded];
+  const compile = (content: string) => () => content;
+  for (const extension of processExtensions) {
+    if (formats.includes(extension)) continue;
     config.addTemplateFormats(extension);
-    config.addExtension(extension, {outputFileExtension: extension, compile})
+    config.addExtension(extension, { outputFileExtension: extension, compile });
   }
 }

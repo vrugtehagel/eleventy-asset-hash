@@ -73,7 +73,6 @@ export async function assetHash(
     directory,
     include: options.include ?? ["**/*.html"],
     exclude: options.exclude,
-    pathPrefix,
   });
 
   await Promise.all(filePaths.map(async (filePath: string) => {

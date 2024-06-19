@@ -1,9 +1,9 @@
 {
   "name": "@vrugtehagel/eleventy-asset-hash",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "exports": "./mod.ts",
   "publish": {
-    "include": ["mod.ts", "README.md"]
+    "include": ["src/**", "mod.ts", "README.md"]
   },
   "tasks": {
     "check": "deno publish --dry-run --allow-dirty"

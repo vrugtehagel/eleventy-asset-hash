@@ -35,7 +35,7 @@ export async function assetHash(
 
   /** Gets a checksum from a file path. The path given must be relative to the
    * project root, i.e. already resolved against `directory` if needed.
-   * It returns null for assets that don't exist. */
+   * It returns `null` for assets that don't exist. */
   getAssetChecksum.cache = new Map<string, string | null>();
   getAssetChecksum.asyncCache = new Map<string, Promise<string | null>>();
   async function getAssetChecksum(path: string): Promise<string | null> {

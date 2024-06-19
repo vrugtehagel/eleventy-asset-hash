@@ -5,6 +5,10 @@ import { assetHash } from "./asset-hash.ts";
  * can understand what this type represents even if TypeScript doesn't. */
 type EleventyConfig = any;
 
+/** The actual plugin itself. The actual hashing happens independently of
+ * Eleventy, we just wait until Eleventy is done and then go over the output
+ * directory to hash assets and add the query parameters.
+ * Options are completely optional. */
 export function EleventyAssetHash(
   config: EleventyConfig,
   options: EleventyAssetHashOptions = {},

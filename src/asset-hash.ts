@@ -86,7 +86,7 @@ export async function assetHash(
       const checksum = await getAssetChecksum(fullPath);
       if (checksum == null) continue;
       const endIndex = index + path.length;
-      result = result[endIndex + 1] == "?"
+      result = result[endIndex] == "?"
         ? insertAt(result, `${param}=${checksum}&`, endIndex + 1)
         : insertAt(result, `?${param}=${checksum}`, endIndex);
     }

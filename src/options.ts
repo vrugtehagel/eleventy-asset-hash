@@ -21,8 +21,8 @@ export type EleventyAssetHashOptions = {
    * By default, processes HTML files only. */
   exclude?: string[];
 
-  /** Assets to compute checksums for. Defaults to processing all assets in the
-   * output directory */
+  /** Assets to compute checksums for. Defaults to processing only styles and
+   * scripts, i.e. files with `.css` or `.js` extensions. */
   includeAssets?: string[];
 
   /** Assets not to compute checksums for. These are not looked at even if they

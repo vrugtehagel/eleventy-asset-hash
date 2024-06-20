@@ -11,7 +11,7 @@ type EleventyConfig = any;
  * Options are completely optional. */
 export function EleventyAssetHash(
   config: EleventyConfig,
-  options: EleventyAssetHashOptions = {},
+  options?: EleventyAssetHashOptions,
 ) {
   config.events.addListener("eleventy.after", async (event: any) => {
     const directory: string = event.dir.output;

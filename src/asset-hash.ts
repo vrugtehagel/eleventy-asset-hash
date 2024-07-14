@@ -1,11 +1,8 @@
 import fs from "node:fs/promises";
 import type { EleventyAssetHashOptions } from "./options.ts";
-import { computeChecksum as defaultComputeChecksum } from "./compute-checksum.ts";
 import { PathResolver } from "./path-resolver.ts";
-import { detectAssets } from "./detect-assets.ts";
+import { stringSplice } from "./string-splice.ts";
 
-/** Hashes assets and appends query params in a certain directory.
- * This is not actually Eleventy-specific. */
 export async function assetHash(
   options: EleventyAssetHashOptions & { directory: string },
 ): Promise<void> {
@@ -22,8 +19,20 @@ export async function assetHash(
     algorithm = "SHA-256",
     maxLength = Infinity,
     param = "v",
-    computeChecksum = (content) => defaultComputeChecksum(content, algorithm),
+    computeChecksum: computer = async (content: ArrayBuffer): Promise<string> => {
+      const buffer = await crypto.subtle.digest(algorithm, content);
+      const uint8Array = new Uint8Array(buffer);
+      return btoa(String.fromCharCode(...uint8Array));
+    }
   } = options;
+
+  /** Create a normalized `computeChecksum` that incorporates maxLength */
+  const hasMaxLength = Number.isFinite(maxLength) && maxLength > 0;
+  const computeChecksum = async (content: ArrayBuffer): string => {
+    const hash = await computer(content)
+    if(!hasMaxLength) return hash;
+    return hash.slice(0, maxLength)
+  }
 
   /** This is going to help resolving asset paths that we find */
   const resolver = new PathResolver({
@@ -33,64 +42,174 @@ export async function assetHash(
     pathPrefix,
   });
 
-  /** Gets a checksum from a file path. The path given must be relative to the
-   * project root, i.e. already resolved against `directory` if needed.
-   * It returns `null` for assets that don't exist. */
-  getAssetChecksum.cache = new Map<string, string | null>();
-  getAssetChecksum.asyncCache = new Map<string, Promise<string | null>>();
-  async function getAssetChecksum(path: string): Promise<string | null> {
-    const cached = getAssetChecksum.cache.get(path);
-    if (cached != null) return cached;
-    const asyncCached = getAssetChecksum.asyncCache.get(path);
-    if (asyncCached != null) return asyncCached;
-    const asyncResult = (async () => {
-      const content = await fs.readFile(path).catch(() => null);
-      if (content == null) return null;
-      const checksum = await computeChecksum(content);
-      if (!Number.isFinite(maxLength)) return checksum;
-      if (maxLength < 0) return checksum;
-      return checksum.slice(0, maxLength);
-    })();
-    getAssetChecksum.asyncCache.set(path, asyncResult);
-    const checksum = await asyncResult;
-    getAssetChecksum.cache.set(path, checksum);
-    getAssetChecksum.asyncCache.delete(path);
-    return checksum;
+  /** Before we start hashing, we create some handy-dandy functions to help
+   * keep things brief and readable. */
+  const hashCache = new Map<string, Promise<string>>();
+  async function hashFile(path: string): Promise<string | null> {
+    const cached = hashCache.get(path);
+    if(cached) return await cached;
+    const asyncResult = forceHashFile(path);
+    hashCache.set(path, asyncResult);
+    return await asyncResult;
+  }
+  function forgetHash(path: string): void {
+    hashCache.delete(path);
+  }
+  async function forceHashFile(path: string): Promise<string | null> {
+    const content = await fs.readFile(path).catch(() => null);
+    if(!content) return null;
+    return await computeChecksum(content);
   }
 
-  /** Insert a string into another at a certain index */
-  function insertAt(
-    target: string,
-    insertion: string,
-    index: number,
-  ): string {
-    return target.slice(0, index) + insertion + target.slice(index);
-  }
-
-  /** Match the files to process, then find the assets in each of them and
-   * insert the query params back-to-front as to not mess with the indexes */
+  /** Now onto the actual hashing! We'll go through the steps as outlined in
+   * the README.
+   * 1. Index all files that nned to be processed. */
   const filePaths = PathResolver.find({
     directory,
     include: options.include ?? ["**/*.html"],
     exclude: options.exclude,
   });
 
-  await Promise.all(filePaths.map(async (filePath: string) => {
+  /** 2. Identify the referenced assets within those files, marking their
+   * positions. */
+  type Reference = {
+    text: string;
+    path: string;
+    endIndex: string;
+    hasParams: boolean;
+    hash?: string | null;
+    naiveHash?: string | null;
+    inserted?: number;
+  }
+  const referenceMap = new Map<string, Reference[]>();
+
+  /** Valid URL path characters are [!$%(-;@-[\]_a-z~].
+   * The entire regex matches assets in a string of content.
+   * This does not match URLs including a domain, by design. */
+  const pathRegex = new RegExp(
+    "(?<=[^!$%(-;@-[\\]_a-z~])" + // must be preceded by non-URL character
+      "\\.{0,2}/" + // then zero to two periods and a slash
+      "[!$%(-;@-[\\]_a-z~]*" + // any number of URL characters
+      "\\.\\w+" + // the file extension, minimum one character long
+      "(?=[^!$%(-;@-[\\]_a-z~])", // followed by a non-URL character
+    "g", // This is not part of the regex, it's just a flag
+  );
+
+  for(const filePath of filePaths){
     const content = await fs.readFile(filePath, { encoding: "utf8" });
-    const matches = detectAssets(content).reverse();
-    if (matches.length == 0) return;
-    let result = content;
-    for (const [index, path] of matches) {
-      const fullPath = resolver.resolve(path, filePath);
-      if (fullPath == null) continue;
-      const checksum = await getAssetChecksum(fullPath);
-      if (checksum == null) continue;
-      const endIndex = index + path.length;
-      result = result[endIndex] == "?"
-        ? insertAt(result, `${param}=${checksum}&`, endIndex + 1)
-        : insertAt(result, `?${param}=${checksum}`, endIndex);
+    const matches = [...content.matchAll(pathRegex)];
+    const references = []
+    for(const match of matches){
+      const text = match[0];
+      const path = resolver.resolve(text, filePath);
+      if(path == null) continue;
+      const endIndex = match.index + text.length;
+      const hasParams = content[endIndex] == "?";
+      references.push({ text, path, endIndex, hasParams });
     }
-    if (content == result) return;
-    await fs.writeFile(filePath, result);
+    referenceMap.set(filePath, references);
+  }
+
+  /** 3. If files exist that only reference assets that are not also indexed
+   * files; add the hashes to these files, and remove them from the index.
+   * Repeat this until no more such files exist. */
+  let previousSize: number;
+  do {
+    previousSize = referenceMap.size;
+    await Promise.all([...referenceMap].map(async ([path, references]) => {
+      const hasDependencies = references
+        .some((reference) => referenceMap.has(reference.path))
+      if (hasDependencies) return;
+      const allHashing = []
+      for(const reference of references){
+        const promise = hashFile(reference.path);
+        promise.then(hash => reference.hash = hash);
+        allHashing.push(promise);
+      }
+      await Promise.all(allHashing);
+      for(let index = references.length - 1; index >= 0; index--){
+        const reference = references[index];
+        if(reference.hash != null) continue;
+        reference.splice(index, 1);
+      }
+      referenceMap.delete(path);
+      if(references.length == 0) return;
+      const content = await fs.readFile(path, { encoding: "utf8" });
+      let transformed = content;
+      for(const reference of references){
+        const { endIndex, hasParams, hash } = reference;
+        transformed = hasParams
+          ? stringSplice(transformed, endIndex + 1, 0, `${param}=${hash}&`)
+          : stringSplice(transformed, endIndex, 0, `?${param}=${hash}`);
+      }
+      await fs.writeFile(path, transformed);
+    }));
+  } while(referenceMap.size < previousSize);
+
+  /** Now that we've got all the "leaves" out of the way, the `referenceMap`
+   * now only contains paths with dependencies that are also in said
+   * `referenceMap`. In other words; we've only got circular dependencies
+   * left. So, on to the next step:
+   * 4. Hash all the remaining files as-is. */
+  await Promise.all([...referenceMap].map(async ([path, references]) => {
+    await Promise.all(references.map(async (reference) => {
+      if(reference.hash) return;
+      const hash = await hashFile(reference.path);
+      if(referenceMap.has(reference.path)){
+        reference.naiveHash = hash;
+      } else {
+        reference.hash = hash;
+      }
+    }));
+  }));
+
+  /** 5. Replace the references to the assets/files with their hash. */
+  await Promise.all([...referenceMap].map(async ([path, references]) => {
+    let offset = 0;
+    const content = await fs.readFile(path, { encoding: "utf8" });
+    let transformed = content;
+    for(const reference of references){
+      reference.endIndex += offset;
+      const { hasParams, endIndex } = reference;
+      const hash = reference.hash ?? reference.naiveHash;
+      transformed = hasParams
+        ? stringSplice(transformed, endIndex + 1, 0, `${param}=${hash}&`)
+        : stringSplice(transformed, endIndex, 0, `?${param}=${hash}`);
+      const inserted = param.length + hash.length + 2;
+      reference.inserted = inserted;
+      offset += inserted;
+    }
+    await fs.writeFile(path, transformed);
+  }));
+
+  /** 6. Hash all the remaining files once more. */
+  await Promise.all([...referenceMap].map(async ([path, references]) => {
+    await Promise.all(references.map(async (reference) => {
+      if(reference.hash) return;
+      forgetHash(reference.path);
+      const hash = await hashFile(reference.path);
+      // console.log(reference.path, hash, reference.naiveHash, reference);
+      reference.naiveHash = hash;
+    }));
+  }));
+
+  /** 7. Replace the references to the assets/files with their new hash. */
+  await Promise.all([...referenceMap].map(async ([path, references]) => {
+    let offset = 0;
+    const content = await fs.readFile(path, { encoding: "utf8" });
+    let transformed = content;
+    for(const reference of references){
+      reference.endIndex += offset;
+      if(reference.hash != null) continue;
+      const { hasParams, endIndex, inserted, naiveHash } = reference;
+      transformed = stringSplice(
+        transformed,
+        endIndex + 1,
+        inserted - 1,
+        `${param}=${naiveHash}`
+      );
+      offset += param.length + naiveHash.length + 2 - inserted;
+    }
+    await fs.writeFile(path, transformed);
   }));
 }

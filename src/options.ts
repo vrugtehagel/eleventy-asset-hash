@@ -42,5 +42,5 @@ export type EleventyAssetHashOptions = {
   param?: string;
 
   /** A custom function to compute checksums. */
-  computeChecksum?: (content: ArrayBuffer) => string;
+  computeChecksum?: (content: ArrayBuffer) => Promise<string>;
 };

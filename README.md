@@ -69,3 +69,23 @@ the `.addPlugin()` call, as an object. It may have the following keys:
 - `computeChecksum`: A custom function to compute checksums based on a file's
   contents. It must accept one argument, an `ArrayBuffer`, and return the
   checksum as a string.
+
+## About the codebase
+
+In theory, asset hashing is relatively simple. A hash is constructed from each file's contents, and references to said files are modified to get a query parameter. This causes the browser to use cached versions of files when they didn't change, and to download the new version when the hash changed.
+
+While this concept sounds simple, it can get a little complex. For one, we can't just first hash all the files and then add the query parameters, since adding the query parameters to a file changes the hash. For example, if file A references file B, and file B changes, then the naive method would not cause a change in file A even though it needs to be re-requested simply because it has a new reference to B.
+
+In other words, to properly do asset hashing, we need to build a dependency tree of sorts, and hash leaves until nothing is left. Unfortunately, there's another issue; circular dependencies. If A depends on B and vice versa, then we can't add the correct hash parameters because B's hash is included in A and vice versa, meaning each hash is dependent on the other. To circumvent this issue, we hash all files within circular dependencies once, replace the hashes inside them, and then hash them again, replacing the hashes one last time. This ensures that if one file in the loop changes, all of them get a new hash; and if none of them changes, all the hashes remain the same.
+
+So, in broad steps, here's what we do:
+
+1. Index all files that need to be processed.
+2. Identify the referenced assets within those files, marking their positions.
+3. If files exist that only reference assets that are not also indexed files; add the hashes to these files, and remove them from the index. Repeat this until no more such files exist.
+4. Hash all the remaining files as-is.
+5. Replace the references to the assets/files with their hash.
+6. Hash all the remaining files once more.
+7. Replace the references to the assets/files with their new hash.
+
+And that's it!

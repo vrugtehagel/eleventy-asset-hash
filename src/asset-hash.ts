@@ -136,11 +136,14 @@ export async function assetHash(
       if(references.length == 0) return;
       const content = await fs.readFile(path, { encoding: "utf8" });
       let transformed = content;
+      let offset = 0;
       for(const reference of references){
+        reference.endIndex += offset;
         const { endIndex, hasParams, hash } = reference;
         transformed = hasParams
           ? stringSplice(transformed, endIndex + 1, 0, `${param}=${hash}&`)
           : stringSplice(transformed, endIndex, 0, `?${param}=${hash}`);
+        offset += param.length + hash.length + 2;
       }
       await fs.writeFile(path, transformed);
     }));

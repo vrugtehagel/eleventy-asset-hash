@@ -28,7 +28,7 @@ export async function assetHash(
 
   /** Create a normalized `computeChecksum` that incorporates maxLength */
   const hasMaxLength = Number.isFinite(maxLength) && maxLength > 0;
-  const computeChecksum = async (content: ArrayBuffer): string => {
+  const computeChecksum = async (content: ArrayBuffer): Promise<string> => {
     const hash = await computer(content)
     if(!hasMaxLength) return hash;
     return hash.slice(0, maxLength)
@@ -44,7 +44,7 @@ export async function assetHash(
 
   /** Before we start hashing, we create some handy-dandy functions to help
    * keep things brief and readable. */
-  const hashCache = new Map<string, Promise<string>>();
+  const hashCache = new Map<string, Promise<string | null>>();
   async function hashFile(path: string): Promise<string | null> {
     const cached = hashCache.get(path);
     if(cached) return await cached;
@@ -75,7 +75,7 @@ export async function assetHash(
   type Reference = {
     text: string;
     path: string;
-    endIndex: string;
+    endIndex: number;
     hasParams: boolean;
     hash?: string | null;
     naiveHash?: string | null;
@@ -130,22 +130,26 @@ export async function assetHash(
       for(let index = references.length - 1; index >= 0; index--){
         const reference = references[index];
         if(reference.hash != null) continue;
-        reference.splice(index, 1);
+        references.splice(index, 1);
       }
-      referenceMap.delete(path);
-      if(references.length == 0) return;
+      if(references.length == 0){
+        referenceMap.delete(path);
+        return;
+      }
       const content = await fs.readFile(path, { encoding: "utf8" });
       let transformed = content;
       let offset = 0;
       for(const reference of references){
         reference.endIndex += offset;
-        const { endIndex, hasParams, hash } = reference;
+        const { endIndex, hasParams } = reference;
+        const hash = reference.hash as string;
         transformed = hasParams
           ? stringSplice(transformed, endIndex + 1, 0, `${param}=${hash}&`)
           : stringSplice(transformed, endIndex, 0, `?${param}=${hash}`);
         offset += param.length + hash.length + 2;
       }
       await fs.writeFile(path, transformed);
+      referenceMap.delete(path);
     }));
   } while(referenceMap.size < previousSize);
 
@@ -174,7 +178,7 @@ export async function assetHash(
     for(const reference of references){
       reference.endIndex += offset;
       const { hasParams, endIndex } = reference;
-      const hash = reference.hash ?? reference.naiveHash;
+      const hash = reference.hash ?? reference.naiveHash as string;
       transformed = hasParams
         ? stringSplice(transformed, endIndex + 1, 0, `${param}=${hash}&`)
         : stringSplice(transformed, endIndex, 0, `?${param}=${hash}`);
@@ -204,14 +208,16 @@ export async function assetHash(
     for(const reference of references){
       reference.endIndex += offset;
       if(reference.hash != null) continue;
-      const { hasParams, endIndex, inserted, naiveHash } = reference;
+      const { hasParams, endIndex } = reference;
+      const inserted = reference.inserted as number;
+      const hash = reference.naiveHash as string;
       transformed = stringSplice(
         transformed,
         endIndex + 1,
         inserted - 1,
-        `${param}=${naiveHash}`
+        `${param}=${hash}`
       );
-      offset += param.length + naiveHash.length + 2 - inserted;
+      offset += param.length + hash.length + 2 - inserted;
     }
     await fs.writeFile(path, transformed);
   }));

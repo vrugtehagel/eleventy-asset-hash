@@ -9,7 +9,8 @@ export type EleventyAssetHashOptions = {
    * `directory` option. However, if the build output is uploaded to be inside
    * example.com/foo/, then the asset needs to be looked up as just /bar.js
    * since the /foo/ folder doesn't exist in the build output. In that case,
-   * you'd want to specify `pathPrefix: '/foo/'`. */
+   * you'd want to specify `pathPrefix: '/foo/'`. Defaults to the `pathPrefix`
+   * specified in your Eleventy config. */
   pathPrefix?: string;
 
   /** Files to process. Defaults to processing only HTML files in the output

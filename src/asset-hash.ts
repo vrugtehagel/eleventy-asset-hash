@@ -125,7 +125,6 @@ export async function assetHash(
       references.push({ path: assetPath, endIndex, hasParams });
       if (fileIndex.has(assetPath)) dependencies.add(assetPath);
     }
-    if (references.length == 0) continue;
     referenceMap.set(path, references);
     dependencyMap.set(path, dependencies);
   }
@@ -192,17 +191,16 @@ export async function assetHash(
    * again. After processing a loop, we remove all files in the loop from the
    * index, dependencyMap, and the referenceMap. */
   while (fileIndex.size > 0) {
-    let size: number | undefined;
-    let smallestFile: string;
-    let smallestLoop: Set<string>;
+    let smallestFile: string | undefined;
+    let smallestLoop: Set<string> | undefined;
     for (const [path, dependencies] of dependencyMap) {
-      if (size != null && dependencies.size >= size) continue;
+      if (smallestLoop && dependencies.size >= smallestLoop.size) continue;
       smallestFile = path;
       smallestLoop = dependencies;
-      size = smallestLoop.size;
-      if (size == 0) break;
+      if (smallestLoop.size == 1) break;
     }
-    if (!smallestLoop) break;
+    if (smallestFile == undefined || smallestLoop == undefined) break;
+    const size = smallestLoop.size;
     for (const dependency of smallestLoop) {
       const subDependencies = dependencyMap.get(dependency);
       if (!subDependencies) continue;

@@ -7,5 +7,10 @@
   },
   "tasks": {
     "check": "deno publish --dry-run --allow-dirty"
+  },
+  "lint": {
+    "rules": {
+      "exclude": ["no-explicit-any"]
+    }
   }
 }

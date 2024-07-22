@@ -4,6 +4,8 @@ import fastGlob from "npm:fast-glob@^3.3.2";
 
 import type { EleventyAssetHashOptions } from "./options.ts";
 
+/** Hashes assets and appends query params in a certain directory.
+ * This is not actually Eleventy-specific. */
 export async function assetHash(
   options: EleventyAssetHashOptions & { directory: string },
 ): Promise<void> {

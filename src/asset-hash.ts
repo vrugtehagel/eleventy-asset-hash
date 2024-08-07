@@ -122,6 +122,7 @@ export async function assetHash(
   const pathRegex = new RegExp(
     "(?<=[^!$%(-;@-[\\]_a-z~])" +
       "\\.{0,2}/" +
+      "(?!/)" +
       "[!$%(-;@-[\\]_a-z~]*" +
       "\\.\\w+" +
       "(?=[^!$%(-;@-[\\]_a-z~])",

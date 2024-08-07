@@ -1,6 +1,6 @@
 {
   "name": "@vrugtehagel/eleventy-asset-hash",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "exports": "./mod.ts",
   "publish": {
     "include": ["src/**", "mod.ts", "README.md"]

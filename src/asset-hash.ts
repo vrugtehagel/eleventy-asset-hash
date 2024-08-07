@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import nodePath from "node:path";
 import fastGlob from "npm:fast-glob@^3.3.2";
+import micromatch from "npm:micromatch@^4.0.5";
 
 import type { EleventyAssetHashOptions } from "./options.ts";
 
@@ -38,6 +39,7 @@ export async function assetHash(
       const uint8Array = new Uint8Array(buffer);
       return btoa(String.fromCharCode(...uint8Array));
     },
+    onMissing = "warn",
   } = options;
 
   /** Create a functions that hashes files by content or path */
@@ -67,6 +69,7 @@ export async function assetHash(
   const forceDotSlash = (path: string): string => path.replace(/^\/?/, "./");
   const forceEndSlash = (path: string): string => path.replace(/\/?$/, "/");
   const cwd = forceEndSlash(forceDotSlash(directory));
+  const forceCwd = (path: string): string => nodePath.join(cwd, path);
   const fileIndex: Set<string> = new Set(
     fastGlob.sync(
       include.map(forceDotSlash),
@@ -82,6 +85,9 @@ export async function assetHash(
 
   /** A helper to resolve asset paths we find within indexed files. It returns
    * `null` when it cannot resolve the path to an existing asset. */
+  const missing = new Set<string>();
+  const fullIncluded = includeAssets.map(forceCwd);
+  const fullExcluded = excludeAssets.map(forceCwd);
   function resolve(assetPath: string, path: string): string | null {
     const isAbsolute = assetPath.startsWith(pathPrefix);
     const isRelative = assetPath.startsWith(".");
@@ -90,6 +96,22 @@ export async function assetHash(
       ? nodePath.join(cwd, `/${assetPath.replace(pathPrefix, "")}`)
       : nodePath.join(nodePath.dirname(path), assetPath);
     if (assetIndex.has(resultingPath)) return resultingPath;
+    if (onMissing == "ignore") return null;
+    if (missing.has(resultingPath)) return null;
+    missing.add(resultingPath);
+    const isIncluded = micromatch.isMatch(
+      resultingPath,
+      fullIncluded,
+      { ignore: fullExcluded },
+    );
+    if (!isIncluded) return null;
+    const message = `Missing asset "${resultingPath}" ` +
+      `(referenced in "${path}")`;
+    if (onMissing == "error") {
+      throw Error(message);
+    } else {
+      console.warn(`Warning: ${message}`);
+    }
     return null;
   }
 

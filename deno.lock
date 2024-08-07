@@ -2,7 +2,8 @@
   "version": "3",
   "packages": {
     "specifiers": {
-      "npm:fast-glob@^3.3.2": "npm:fast-glob@3.3.2"
+      "npm:fast-glob@^3.3.2": "npm:fast-glob@3.3.2",
+      "npm:micromatch@^4.0.5": "npm:micromatch@4.0.7"
     },
     "npm": {
       "@nodelib/fs.scandir@2.1.5": {

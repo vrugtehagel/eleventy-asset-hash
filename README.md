@@ -69,7 +69,7 @@ the `.addPlugin()` call, as an object. It may have the following keys:
 - `computeChecksum`: A custom function to compute checksums based on a file's
   contents. It must accept one argument, an `ArrayBuffer`, and return the
   checksum as a string.
-- `onMissing`: An missing asset is one that is matched by `includeAssets`, not
+- `onMissing`: A missing asset is one that is matched by `includeAssets`, not
   excluded by `excludeAssets` and referenced by a processed entry file, but not
   found in the file system. This option determines what should happen when such
   a file is found; set to either `"ignore"` to ignore missing assets, `"warn"`

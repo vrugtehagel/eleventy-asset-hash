@@ -32,23 +32,24 @@ export type EleventyAssetHashOptions = {
   excludeAssets?: string[];
 
   /** The hashing algorithm to use. Ignored if a custom `computeChecksum`
-   * option is given. Must be a type supported by `crypto.subtle.digest()`. */
+   * option is given. Must be a type supported by `crypto.subtle.digest()`.
+   * Defaults to `'SHA-256'`. */
   algorithm?: "SHA-1" | "SHA-256" | "SHA-384" | "SHA-512";
 
   /** A length to limit the hashes to, to avoid excessively long query
    * parameters. Note that trimmed hashes are less clash-resistant. */
   maxLength?: number;
 
-  /** The name for the query param to use. Defaults to `'v'` */
+  /** The name for the query param to use. Defaults to `'v'`. */
   param?: string;
 
   /** A custom function to compute checksums. */
   computeChecksum?: (content: ArrayBuffer) => Promise<string>;
 
   /** Determines what should happen when an asset is referenced that is matched
-   * by `includeAssets` and not by `excludeAssets`, but is not found in  the
+   * by `includeAssets` and not by `excludeAssets`, but is not found in the
    * filesystem. `"ignore"` does nothing, `"warn"` logs a warning (but continues
-   * hasing) and `"error"` throws an error and halts the hashing process
+   * hashing) and `"error"` throws an error and halts the hashing process
    * altogether. Defaults to `"warn"`. */
   onMissing?: "ignore" | "warn" | "error";
 };

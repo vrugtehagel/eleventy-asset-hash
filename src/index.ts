@@ -14,7 +14,7 @@ export function EleventyAssetHash(
   options?: EleventyAssetHashOptions,
 ) {
   config.events.addListener("eleventy.after", async () => {
-    const directory: string = config.dir.output;
+    const directory: string = config.directories.output;
     const pathPrefix: string = config.pathPrefix ?? "/";
     await assetHash({ directory, pathPrefix, ...options });
   });

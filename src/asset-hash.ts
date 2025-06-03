@@ -50,8 +50,9 @@ export async function assetHash(
     return hash.slice(0, maxLength);
   }
   async function hashFile(path: string): Promise<string | null> {
-    const buffer = await fs.readFile(path).catch(() => null);
-    if (!buffer) return null;
+    const uint8Array = await fs.readFile(path).catch(() => null);
+    if (!uint8Array) return null;
+    const { buffer } = new Uint8Array(uint8Array);
     return await hashContents(buffer);
   }
 
@@ -196,8 +197,9 @@ export async function assetHash(
       },
     ));
     const combined = contents.join("");
-    const { buffer } = encoder.encode(combined);
-    const hash = await hashContents(buffer);
+    const uint8Array = new Uint8Array();
+    encoder.encodeInto(combined, uint8Array);
+    const hash = await hashContents(uint8Array.buffer);
     for (const dependency of dependencies) {
       hashCache.set(dependency, Promise.resolve(hash));
     }

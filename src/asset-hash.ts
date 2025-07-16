@@ -121,12 +121,12 @@ export async function assetHash(
    * just the assets, because we'll still just ignore them if we can't resolve
    * them to an existing asset path. */
   const pathRegex = new RegExp(
-    "(?<=[^!$%(-;@-[\\]_a-z~])" +
+    "(?<=[^!$%*-;@-[\\]_a-z~])" +
       "\\.{0,2}/" +
       "(?!/)" +
-      "[!$%(-;@-[\\]_a-z~]*" +
+      "[!$%*-;@-[\\]_a-z~]*" +
       "\\.\\w+" +
-      "(?=[^!$%(-;@-[\\]_a-z~])",
+      "(?![!$%*-;@-[\\]_a-z~])",
     "g",
   );
 

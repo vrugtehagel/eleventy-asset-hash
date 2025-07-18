@@ -52,8 +52,7 @@ export async function assetHash(
   async function hashFile(path: string): Promise<string | null> {
     const uint8Array = await fs.readFile(path).catch(() => null);
     if (!uint8Array) return null;
-    const { buffer } = new Uint8Array(uint8Array);
-    return await hashContents(buffer);
+    return await hashContents(uint8Array.buffer as ArrayBuffer);
   }
 
   /** Create a function that hashes a file, but with cache to avoid work */

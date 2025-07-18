@@ -186,7 +186,6 @@ export async function assetHash(
   /** When we find a "smallest dependency loop", we need to hash its non-indexed
    * assets, insert the query parameters, and then hash the files from the loop
    * altogether. */
-  const encoder = new TextEncoder();
   async function processLoop(dependencies: Set<string>): Promise<void> {
     const sortedDependencies = [...dependencies].sort();
     const contents = await Promise.all(sortedDependencies.map(
@@ -197,8 +196,8 @@ export async function assetHash(
       },
     ));
     const combined = contents.join("");
-    const uint8Array = new Uint8Array();
-    encoder.encodeInto(combined, uint8Array);
+    const encoder = new TextEncoder();
+    const uint8Array = encoder.encode(combined) as Uint8Array<ArrayBuffer>;
     const hash = await hashContents(uint8Array.buffer);
     for (const dependency of dependencies) {
       hashCache.set(dependency, Promise.resolve(hash));

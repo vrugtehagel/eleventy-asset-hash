@@ -24,11 +24,11 @@ In your Eleventy configuration file (usually `.eleventy.js`), import/require the
 module and add the plugin using `.addPlugin()`:
 
 ```js
-import EleventyDocumentOutline from "@vrugtehagel/eleventy-asset-hash";
+import EleventyAssetHash from "@vrugtehagel/eleventy-asset-hash";
 
 export default function (eleventyConfig) {
   // …
-  eleventyConfig.addPlugin(EleventyDocumentOutline, {
+  eleventyConfig.addPlugin(EleventyAssetHash, {
     algorithm: "SHA-256",
     include: ["**/*.html"],
     includeAssets: ["**/*.{css,js}"],

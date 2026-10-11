@@ -1,5 +1,8 @@
 # eleventy-asset-hash
 
+> [!CAUTION]
+> This package is deprecated in favor of the more generic [@vrugtehagel/asset-hash](https://www.npmjs.com/package/@vrugtehagel/asset-hash) on NPM. Please use that instead.
+
 Adds a hash query parameter to URLs in Eleventy projects (or even outside of
 Eleventy projects).
 
